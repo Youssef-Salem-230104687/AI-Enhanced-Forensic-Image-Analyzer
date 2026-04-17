@@ -1,0 +1,9 @@
+PyQt5 (For the interface)
+
+exifread (For metadata)
+
+folium (For maps)
+
+tensorflow or torch (For the AI bonus)
+
+reportlab (For PDF generation)
