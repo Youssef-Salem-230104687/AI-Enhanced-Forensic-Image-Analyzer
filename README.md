@@ -10,7 +10,7 @@
 - 📜 Forensic Reporting: Generates a full report including an automated "Chain of Custody" log.
 
 ## Installation 
-1. Clone the repository: git clone [Your Link]
+1. Clone the repository: git clone https://github.com/Youssef-Salem-230104687/AI-Enhanced-Forensic-Image-Analyzer/tree/main
 2. Install dependencies: pip install -r requirements.txt 
 
 ## How to Use
