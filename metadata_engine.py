@@ -61,7 +61,7 @@ class MetadataEngine:
     
 # Updated TEST SCRIPT for MetadataEngine
 if __name__ == "__main__":
-    test_path = "DSCN0027.jpg" 
+    test_path = "evidence/DSCN0027.jpg" 
     engine = MetadataEngine(test_path)
     data = engine.extract_all()
     
