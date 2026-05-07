@@ -1,19 +1,14 @@
 import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, 
-                             QHBoxLayout, QWidget, QFileDialog, QLabel, QTextEdit, QFrame)
-from PyQt5.QtGui import QPixmap, QFont
+                             QHBoxLayout, QWidget, QFileDialog, QLabel, QTextEdit, QMessageBox)
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 import folium
 import webbrowser
 
-# استدعاء ملفات الفريق (يوسف والعضو الثالث)
 from metadata_engine import MetadataEngine 
-try:
-    from ai_classifier import ForensicAI
-    AI_AVAILABLE = True
-except ImportError:
-    AI_AVAILABLE = False
+from ai_classifier import ForensicAI, ReportGenerator
 
 class ForensicGUI(QMainWindow):
     def __init__(self):
@@ -21,15 +16,12 @@ class ForensicGUI(QMainWindow):
         self.setWindowTitle("AI-Enhanced Forensic Image Analyzer v1.0")
         self.setGeometry(100, 100, 1100, 800)
         self.current_coords = None
-        
-        # تشغيل محرك الذكاء الاصطناعي (الـ Bonus)
-        if AI_AVAILABLE:
-            self.ai_engine = ForensicAI()
-        
+        self.current_report_data = ""
+        self.report_directory = "" # Added to track save location
+        self.ai_engine = ForensicAI()
         self.initUI()
 
     def initUI(self):
-        # تنسيق احترافي للواجهة (Dark Forensic Theme)
         self.setStyleSheet("""
             QMainWindow { background-color: #121212; }
             QLabel { color: #e0e0e0; font-size: 14px; font-weight: bold; }
@@ -45,8 +37,6 @@ class ForensicGUI(QMainWindow):
         """)
 
         main_layout = QHBoxLayout()
-        
-        # --- الجزء الأيسر: عرض الصورة والتحكم ---
         left_panel = QVBoxLayout()
         
         self.btn_load = QPushButton("📂 Upload Evidence Image")
@@ -65,9 +55,13 @@ class ForensicGUI(QMainWindow):
         self.btn_map.clicked.connect(self.open_map)
         left_panel.addWidget(self.btn_map)
 
-        # --- الجزء الأيمن: التقرير الجنائي ونتائج الـ AI ---
+        self.btn_pdf = QPushButton("📄 Export Official Report")
+        self.btn_pdf.setEnabled(False)
+        self.btn_pdf.setStyleSheet("background-color: #28a745; font-weight: bold;")
+        self.btn_pdf.clicked.connect(self.save_report)
+        left_panel.addWidget(self.btn_pdf)
+
         right_panel = QVBoxLayout()
-        
         right_panel.addWidget(QLabel("🔍 Forensic Investigation Logs:"))
         self.result_display = QTextEdit()
         self.result_display.setReadOnly(True)
@@ -83,67 +77,78 @@ class ForensicGUI(QMainWindow):
     def load_image(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select Forensic Evidence", "", "Images (*.jpg *.jpeg *.png)")
         if file_path:
-            # تحديث عرض الصورة
             pixmap = QPixmap(file_path).scaled(500, 400, Qt.KeepAspectRatio)
             self.img_label.setPixmap(pixmap)
-            self.img_label.setStyleSheet("border: 2px solid #007acc;")
-            
-            # بدء التحليل الشامل
             self.run_full_analysis(file_path)
 
     def run_full_analysis(self, path):
         self.result_display.setText(">>> STARTING FORENSIC ANALYSIS...\n")
-        
         try:
-            # 1. استخراج الميتا داتا (شغل يوسف)
             engine = MetadataEngine(path)
             tags = engine.extract_all()
             coords = engine.get_decimal_coordinates()
             
-            report = f"[+] FILE: {os.path.basename(path)}\n"
+            report = f"FORENSIC ANALYSIS REPORT\n"
+            report += f"========================\n"
+            report += f"[+] FILE: {os.path.basename(path)}\n"
             report += f"[+] TIMESTAMP: {tags.get('Image DateTime', 'N/A')}\n"
             report += f"[+] DEVICE: {tags.get('Image Model', 'N/A')}\n"
             
-            # كشف التلاعب (Anomaly Detection)
             if engine.is_tampered:
-                report += f"\n[!!!] ALERT: METADATA MANIPULATION DETECTED!\n"
-                report += f"Software Trace: {tags.get('Image Software')}\n"
+                report += f"\n[!!!] ALERT: METADATA MANIPULATION DETECTED!\n[REASON]: {engine.tamper_reason}\n"
             else:
                 report += f"\n[✓] INTEGRITY: No editing software traces found.\n"
 
-            # 2. تحليل الذكاء الاصطناعي (شغل العضو الثالث - الـ Bonus)
-            if AI_AVAILABLE:
-                report += f"\n[⚡] AI OBJECT IDENTIFICATION:\n"
-                ai_results = self.ai_engine.classify_image(path)
-                for label, prob in ai_results:
-                    report += f"  - {label.replace('_', ' ')}: {prob}%\n"
+            report += f"\n[⚡] AI OBJECT IDENTIFICATION:\n"
+            ai_results = self.ai_engine.classify_image(path)
+            for label, prob in ai_results:
+                report += f"  - {label}: {prob}%\n"
 
-            # 3. إحداثيات الموقع
             if coords:
                 report += f"\n[+] GEOLOCATION FOUND: {coords}\n"
                 self.current_coords = coords
                 self.btn_map.setEnabled(True)
             else:
-                report += f"\n[-] GEOLOCATION: No GPS tags present.\n"
-                self.current_coords = None
+                report += f"\n[-] GEOLOCATION: Not Found.\n"
                 self.btn_map.setEnabled(False)
 
+            self.current_report_data = report
             self.result_display.append(report)
+            self.btn_pdf.setEnabled(True)
             
         except Exception as e:
-            self.result_display.append(f"\n[!] CRITICAL ERROR: {str(e)}")
+            self.result_display.append(f"\n[!] ERROR: {str(e)}")
 
     def open_map(self):
         if self.current_coords:
-            # إنشاء الخريطة
+            # If a report was saved, use that directory. Otherwise, use project root.
+            save_path = os.path.join(self.report_directory, "forensic_map.html") if self.report_directory else "forensic_map.html"
             m = folium.Map(location=self.current_coords, zoom_start=15)
             folium.Marker(self.current_coords, popup="Evidence Origin").add_to(m)
+            m.save(save_path)
+            webbrowser.open(save_path)
+    
+    def save_report(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Forensic Report", "Forensic_Report.pdf", "PDF Files (*.pdf)")
+        if file_path:
+            if not file_path.lower().endswith('.pdf'): file_path += '.pdf'
             
-            map_file = "forensic_map.html"
-            m.save(map_file)
+            # Store the directory chosen by the user
+            self.report_directory = os.path.dirname(file_path)
             
-            # فتح الخريطة في المتصفح
-            webbrowser.open('file://' + os.path.realpath(map_file))
+            success = ReportGenerator.generate_pdf(file_path, self.current_report_data)
+            if success:
+                # If there are coordinates, auto-save the map to the same folder
+                if self.current_coords:
+                    map_path = os.path.join(self.report_directory, "forensic_map.html")
+                    m = folium.Map(location=self.current_coords, zoom_start=15)
+                    folium.Marker(self.current_coords, popup="Evidence Origin").add_to(m)
+                    m.save(map_path)
+                
+                QMessageBox.information(self, "Success", f"Report and Map saved at:\n{self.report_directory}")
+            else:
+                error_msg = ReportGenerator.last_error.splitlines()[-1]
+                QMessageBox.critical(self, "Error", f"Failed to save PDF.\nDetails: {error_msg}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
