@@ -9,9 +9,14 @@ def safe_md5(*args, **kwargs):
 
 hashlib.md5 = safe_md5
 
-import tensorflow as tf
-from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input, decode_predictions
-from tensorflow.keras.preprocessing import image
+try:
+    import tensorflow as tf
+    from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input, decode_predictions
+    from tensorflow.keras.preprocessing import image
+    TF_AVAILABLE = True
+except ImportError as e:
+    print(f"[*] Warning: TensorFlow could not load ({e}). AI Categorization will be disabled.")
+    TF_AVAILABLE = False
 import numpy as np
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -21,11 +26,17 @@ import traceback
 
 class ForensicAI:
     def __init__(self):
-        print("[*] Initializing ResNet50 Forensic Engine...")
-        self.model = ResNet50(weights='imagenet')
-        self.forensic_targets = ['revolver', 'rifle', 'knife', 'cellular', 'notebook', 'money', 'laptop']
+        if TF_AVAILABLE:
+            print("[*] Initializing ResNet50 Forensic Engine...")
+            self.model = ResNet50(weights='imagenet')
+            self.forensic_targets = ['revolver', 'rifle', 'knife', 'cellular', 'notebook', 'money', 'laptop']
+        else:
+            self.model = None
+            self.forensic_targets = []
 
     def classify_image(self, img_path):
+        if not TF_AVAILABLE:
+            return [("AI System Offline (Missing TensorFlow runtime)", 0.0)]
         try:
             img = image.load_img(img_path, target_size=(224, 224))
             x = image.img_to_array(img)

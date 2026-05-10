@@ -1,5 +1,6 @@
 import exifread
 from PIL import Image
+import hashlib
 
 class MetadataEngine:
     def __init__(self, image_path):
@@ -7,6 +8,17 @@ class MetadataEngine:
         self.tags = {}
         self.is_tampered = False
         self.tamper_reason = "No issues detected."
+        self.file_hash = self.generate_hash()
+
+    def generate_hash(self):
+        sha256_hash = hashlib.sha256()
+        try:
+            with open(self.image_path, "rb") as f:
+                for byte_block in iter(lambda: f.read(4096), b""):
+                    sha256_hash.update(byte_block)
+            return sha256_hash.hexdigest()
+        except:
+            return "Hash Computation Failed"
 
     def extract_all(self):
         try:

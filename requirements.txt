@@ -9,3 +9,5 @@ tensorflow #(For the AI bonus)
 reportlab #(For PDF generation)
 
 Pillow #(For image processing)
+
+PyQtWebEngine #(For embedded map)
